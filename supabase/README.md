@@ -1,0 +1,1 @@
+نفّذ `migrations/001_initial_schema.sql` في SQL Editor داخل مشروع Supabase قبل تشغيل التطبيق. يجب تفعيل Email provider، ثم استخدام Project URL والمفتاح Publishable/anon داخل طبقة التطبيق. لا تستخدم service_role داخل Android.
