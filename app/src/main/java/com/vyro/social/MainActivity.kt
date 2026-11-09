@@ -50,9 +50,9 @@ private fun VyroApp(prefs: android.content.SharedPreferences) {
     var session by remember { mutableStateOf(prefs.getString("access_token", null)) }
     var userName by remember { mutableStateOf(prefs.getString("name", "مستخدم VYRO") ?: "مستخدم VYRO") }
     if (session.isNullOrBlank()) {
-        AuthScreen(onAuthenticated = { name, remote ->
-            userName = name.ifBlank { "مستخدم VYRO" }; session = remote.accessToken
-            prefs.edit().putString("access_token", remote.accessToken).putString("user_id", remote.userId).putString("name", userName).apply()
+        AuthScreen(onAuthenticated = { name, username, remote ->
+            userName = name.ifBlank { username }; session = remote.accessToken
+            prefs.edit().putString("access_token", remote.accessToken).putString("user_id", remote.userId).putString("name", userName).putString("username", username).apply()
         })
     } else {
         MainShell(userName = userName, prefs = prefs, onLogout = { prefs.edit().clear().apply(); session = null })
@@ -60,9 +60,10 @@ private fun VyroApp(prefs: android.content.SharedPreferences) {
 }
 
 @Composable
-private fun AuthScreen(onAuthenticated: (String, RemoteSession) -> Unit) {
+private fun AuthScreen(onAuthenticated: (String, String, RemoteSession) -> Unit) {
     var register by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
@@ -73,11 +74,14 @@ private fun AuthScreen(onAuthenticated: (String, RemoteSession) -> Unit) {
         Spacer(Modifier.height(18.dp)); Text("VYRO", color = Purple, fontSize = 34.sp, fontWeight = FontWeight.Black, letterSpacing = 5.sp)
         Text(if (register) "أنشئ مساحتك الاجتماعية" else "عالمك، ناسك، مساحتك", color = Muted)
         Spacer(Modifier.height(28.dp))
-        if (register) Field(name, { name = it }, "الاسم الظاهر")
+        if (register) { Field(name, { name = it }, "الاسم الظاهر"); Field(username, { username = it.lowercase().replace(" ", "") }, "اسم المستخدم @username") }
         Field(email, { email = it }, "البريد الإلكتروني")
         Field(password, { password = it }, "كلمة المرور", true)
         if (error.isNotBlank()) Text(error, color = Pink, fontSize = 12.sp, modifier = Modifier.padding(8.dp))
-        Button(onClick = { busy = true; error = ""; scope.launch { runCatching { if (register) SupabaseApi.signUp(email.trim(), password, name.trim()) else SupabaseApi.signIn(email.trim(), password) }.onSuccess { onAuthenticated(name, it) }.onFailure { error = it.message ?: "تعذر الاتصال بـ Supabase" }; busy = false } }, enabled = !busy, modifier = Modifier.fillMaxWidth().height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = Purple), shape = RoundedCornerShape(16.dp)) { Text(if (busy) "جارٍ الاتصال..." else if (register) "إنشاء حساب حقيقي" else "تسجيل الدخول", fontWeight = FontWeight.Bold) }
+        Button(onClick = { busy = true; error = ""; scope.launch { runCatching {
+            if (register) { require(username.matches(Regex("[a-z0-9_]{3,30}"))) { "اليوزر يجب أن يكون 3-30 حرفًا إنجليزيًا أو رقمًا أو _" }; require(password.length >= 6) { "كلمة المرور يجب أن تكون 6 أحرف على الأقل" }; SupabaseApi.signUp(email.trim(), password, username, name.trim()) }
+            else SupabaseApi.signIn(email.trim(), password)
+        }.onSuccess { onAuthenticated(name, username, it) }.onFailure { error = it.message ?: "تعذر الاتصال بـ Supabase" }; busy = false } }, enabled = !busy, modifier = Modifier.fillMaxWidth().height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = Purple), shape = RoundedCornerShape(16.dp)) { Text(if (busy) "جارٍ الاتصال..." else if (register) "إنشاء حساب حقيقي" else "تسجيل الدخول", fontWeight = FontWeight.Bold) }
         TextButton(onClick = { register = !register; error = "" }) { Text(if (register) "لديك حساب؟ سجّل الدخول" else "ليس لديك حساب؟ أنشئ حسابًا", color = Cyan) }
         Text("الحسابات والبيانات تُحفظ في Supabase", color = Muted, fontSize = 11.sp, textAlign = TextAlign.Center)
     }
@@ -100,7 +104,7 @@ private fun MainShell(userName: String, prefs: android.content.SharedPreferences
                     Tab.SHORTS -> Feature("VYRO SHORTS", "فيديوهات عمودية قصيرة", "سيتم ربط التخزين، الضغط، والتشغيل المتتابع عبر Supabase Storage.")
                     Tab.ROOMS -> RoomsScreen(prefs)
                     Tab.MESSAGES -> Messages()
-                    Tab.PROFILE -> Profile(userName, onLogout)
+                    Tab.PROFILE -> Profile(userName, prefs, onLogout)
                 }
             }
         }
@@ -126,7 +130,20 @@ private fun MainShell(userName: String, prefs: android.content.SharedPreferences
 
 @Composable private fun Messages() { Column(Modifier.fillMaxSize().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { Icon(Icons.Default.ChatBubble, null, tint = Cyan, modifier = Modifier.size(64.dp)); Spacer(Modifier.height(16.dp)); Text("رسائلك الخاصة", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold); Text("ابدأ محادثات آمنة مع مجتمعك. طبقة المحادثات البعيدة قيد الربط مع Supabase Realtime.", color = Muted, textAlign = TextAlign.Center, modifier = Modifier.padding(18.dp)); Button({ }, colors = ButtonDefaults.buttonColors(containerColor = Purple)) { Text("إنشاء محادثة") } } }
 
-@Composable private fun Profile(userName: String, onLogout: () -> Unit) { Column(Modifier.fillMaxSize().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) { Box(Modifier.size(92.dp).background(Brush.linearGradient(listOf(Purple, Cyan, Pink)), CircleShape), contentAlignment = Alignment.Center) { Text(userName.take(1), color = Color.White, fontSize = 38.sp, fontWeight = FontWeight.Bold) }; Spacer(Modifier.height(12.dp)); Text(userName, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold); Text("@vyro_user", color = Muted); Spacer(Modifier.height(22.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) { Stat("منشور", "3"); Stat("متابع", "128"); Stat("يتابع", "64") }; Spacer(Modifier.height(28.dp)); OutlinedButton(onLogout, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Logout, null); Spacer(Modifier.width(8.dp)); Text("تسجيل الخروج") }; Spacer(Modifier.height(12.dp)); Text("الملف الشخصي محلي حاليًا. أضف Supabase للمزامنة والصور.", color = Muted, fontSize = 11.sp, textAlign = TextAlign.Center) } }
+@Composable private fun Profile(userName: String, prefs: android.content.SharedPreferences, onLogout: () -> Unit) {
+    var profile by remember { mutableStateOf<RemoteProfile?>(null) }
+    var error by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) { runCatching { SupabaseApi.profile(prefs.getString("access_token", "") ?: "", prefs.getString("user_id", "") ?: "") }.onSuccess { profile = it }.onFailure { error = it.message ?: "تعذر تحميل الحساب" } }
+    val shownName = profile?.displayName?.ifBlank { userName } ?: userName
+    Column(Modifier.fillMaxSize().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(92.dp).background(Brush.linearGradient(listOf(Purple, Cyan, Pink)), CircleShape), contentAlignment = Alignment.Center) { Text(shownName.take(1), color = Color.White, fontSize = 38.sp, fontWeight = FontWeight.Bold) }
+        Spacer(Modifier.height(12.dp)); Text(shownName, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold); Text("@${profile?.username ?: prefs.getString("username", "")}", color = Muted)
+        if (profile?.bio?.isNotBlank() == true) Text(profile!!.bio, color = Muted, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+        Spacer(Modifier.height(22.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) { Stat("منشور", profile?.posts?.toString() ?: "—"); Stat("متابع", profile?.followers?.toString() ?: "—"); Stat("يتابع", profile?.following?.toString() ?: "—") }
+        if (error.isNotBlank()) Text(error, color = Pink, fontSize = 12.sp, modifier = Modifier.padding(12.dp))
+        Spacer(Modifier.height(28.dp)); OutlinedButton(onLogout, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Logout, null); Spacer(Modifier.width(8.dp)); Text("تسجيل الخروج") }
+    }
+}
 @Composable private fun Stat(label: String, value: String) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(value, color = Cyan, fontSize = 20.sp, fontWeight = FontWeight.Bold); Text(label, color = Muted, fontSize = 11.sp) } }
 
 @Composable private fun Feature(title: String, subtitle: String, description: String) { Column(Modifier.fillMaxSize().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { Box(Modifier.size(104.dp).background(Brush.linearGradient(listOf(Purple, Cyan, Pink)), RoundedCornerShape(30.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(48.dp)) }; Spacer(Modifier.height(24.dp)); Text(title, color = Purple, fontSize = 25.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp); Text(subtitle, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold); Spacer(Modifier.height(10.dp)); Text(description, color = Muted, fontSize = 14.sp, lineHeight = 22.sp, textAlign = TextAlign.Center); Spacer(Modifier.height(20.dp)); Surface(color = Panel, shape = RoundedCornerShape(14.dp)) { Text("المرحلة التالية • Coming soon", color = Cyan, modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)) } } }

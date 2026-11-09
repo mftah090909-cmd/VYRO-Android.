@@ -16,19 +16,33 @@ internal object SupabaseConfig {
 internal data class RemoteSession(val accessToken: String, val userId: String)
 internal data class RemotePost(val id: String, val author: String, val handle: String, val body: String, val likes: Int, val liked: Boolean)
 internal data class LiveKitToken(val token: String, val url: String)
+internal data class RemoteProfile(val username: String, val displayName: String, val bio: String, val followers: Int, val following: Int, val posts: Int)
 
 internal object SupabaseApi {
     suspend fun signIn(email: String, password: String): RemoteSession = auth("/auth/v1/token?grant_type=password", email, password)
-    suspend fun signUp(email: String, password: String, displayName: String): RemoteSession = auth("/auth/v1/signup", email, password, displayName)
+    suspend fun signUp(email: String, password: String, username: String, displayName: String): RemoteSession = auth("/auth/v1/signup", email, password, displayName, username)
 
-    private suspend fun auth(path: String, email: String, password: String, displayName: String = "") = withContext(Dispatchers.IO) {
+    private suspend fun auth(path: String, email: String, password: String, displayName: String = "", username: String = "") = withContext(Dispatchers.IO) {
         val body = JSONObject().put("email", email).put("password", password)
-        if (displayName.isNotBlank()) body.put("data", JSONObject().put("display_name", displayName).put("username", "user_${email.substringBefore('@').take(20)}"))
+        if (displayName.isNotBlank() || username.isNotBlank()) body.put("data", JSONObject().put("display_name", displayName).put("username", username))
         val json = JSONObject(request("POST", path, body.toString()))
         val token = json.optString("access_token")
         val user = json.optJSONObject("user") ?: throw IllegalStateException("لم يتم إنشاء جلسة. تحقق من تأكيد البريد في Supabase.")
         if (token.isBlank()) throw IllegalStateException("الحساب يحتاج تأكيد البريد الإلكتروني قبل تسجيل الدخول.")
         RemoteSession(token, user.optString("id"))
+    }
+
+    suspend fun profile(token: String, userId: String): RemoteProfile = withContext(Dispatchers.IO) {
+        val item = JSONArray(request("GET", "/rest/v1/profiles?id=eq.$userId&select=username,display_name,bio", null, token)).getJSONObject(0)
+        val followers = JSONArray(request("GET", "/rest/v1/follows?following_id=eq.$userId&select=follower_id", null, token)).length()
+        val following = JSONArray(request("GET", "/rest/v1/follows?follower_id=eq.$userId&select=following_id", null, token)).length()
+        val posts = JSONArray(request("GET", "/rest/v1/posts?author_id=eq.$userId&select=id", null, token)).length()
+        RemoteProfile(item.optString("username"), item.optString("display_name"), item.optString("bio"), followers, following, posts)
+    }
+
+    suspend fun follow(token: String, userId: String, targetId: String, following: Boolean) = withContext(Dispatchers.IO) {
+        if (following) request("POST", "/rest/v1/follows", JSONObject().put("follower_id", userId).put("following_id", targetId).toString(), token, "return=minimal")
+        else request("DELETE", "/rest/v1/follows?follower_id=eq.$userId&following_id=eq.$targetId", null, token)
     }
 
     suspend fun posts(token: String, userId: String): List<RemotePost> = withContext(Dispatchers.IO) {
