@@ -15,6 +15,7 @@ internal object SupabaseConfig {
 
 internal data class RemoteSession(val accessToken: String, val userId: String)
 internal data class RemotePost(val id: String, val author: String, val handle: String, val body: String, val likes: Int, val liked: Boolean)
+internal data class LiveKitToken(val token: String, val url: String)
 
 internal object SupabaseApi {
     suspend fun signIn(email: String, password: String): RemoteSession = auth("/auth/v1/token?grant_type=password", email, password)
@@ -52,6 +53,11 @@ internal object SupabaseApi {
 
     suspend fun comment(token: String, postId: String, userId: String, body: String) = withContext(Dispatchers.IO) {
         request("POST", "/rest/v1/comments", JSONObject().put("post_id", postId).put("author_id", userId).put("body", body).toString(), token, "return=minimal")
+    }
+
+    suspend fun liveKitToken(token: String, room: String): LiveKitToken = withContext(Dispatchers.IO) {
+        val json = JSONObject(request("POST", "/functions/v1/livekit-token", JSONObject().put("room", room).toString(), token))
+        LiveKitToken(json.getString("token"), json.getString("url"))
     }
 
     private fun request(method: String, path: String, body: String?, token: String? = null, prefer: String? = null): String {
