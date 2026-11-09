@@ -26,12 +26,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
-private val Ink = Color(0xFF100F1B)
-private val Panel = Color(0xFF1B1929)
-private val Purple = Color(0xFF9A6BFF)
-private val Cyan = Color(0xFF38D7D0)
-private val Pink = Color(0xFFFF72B6)
-private val Muted = Color(0xFFAAA6BC)
+internal val Ink = Color(0xFF100F1B)
+internal val Panel = Color(0xFF1B1929)
+internal val Purple = Color(0xFF9A6BFF)
+internal val Cyan = Color(0xFF38D7D0)
+internal val Pink = Color(0xFFFF72B6)
+internal val Muted = Color(0xFFAAA6BC)
 
 private data class VyroPost(val author: String, val handle: String, val body: String, val tag: String, var likes: Int, var liked: Boolean = false, val comments: MutableList<String> = mutableListOf(), val remoteId: String = "")
 private enum class Tab(val ar: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
