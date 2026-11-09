@@ -98,7 +98,7 @@ private fun MainShell(userName: String, prefs: android.content.SharedPreferences
                 when (selected) {
                     Tab.HOME -> Feed(posts, userName, prefs)
                     Tab.SHORTS -> Feature("VYRO SHORTS", "فيديوهات عمودية قصيرة", "سيتم ربط التخزين، الضغط، والتشغيل المتتابع عبر Supabase Storage.")
-                    Tab.ROOMS -> Feature("VYRO ROOMS", "رومات صوتية مباشرة", "تحتاج هذه الميزة مزود صوت حقيقي مثل LiveKit أو Agora، وليست واجهة وهمية.")
+                    Tab.ROOMS -> RoomsScreen(prefs)
                     Tab.MESSAGES -> Messages()
                     Tab.PROFILE -> Profile(userName, onLogout)
                 }
