@@ -23,7 +23,7 @@ internal object SupabaseApi {
     private suspend fun auth(path: String, email: String, password: String, displayName: String = "") = withContext(Dispatchers.IO) {
         val body = JSONObject().put("email", email).put("password", password)
         if (displayName.isNotBlank()) body.put("data", JSONObject().put("display_name", displayName).put("username", "user_${email.substringBefore('@').take(20)}"))
-        val json = request("POST", path, body.toString())
+        val json = JSONObject(request("POST", path, body.toString()))
         val token = json.optString("access_token")
         val user = json.optJSONObject("user") ?: throw IllegalStateException("لم يتم إنشاء جلسة. تحقق من تأكيد البريد في Supabase.")
         if (token.isBlank()) throw IllegalStateException("الحساب يحتاج تأكيد البريد الإلكتروني قبل تسجيل الدخول.")

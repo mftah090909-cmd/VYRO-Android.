@@ -33,7 +33,7 @@ private val Cyan = Color(0xFF38D7D0)
 private val Pink = Color(0xFFFF72B6)
 private val Muted = Color(0xFFAAA6BC)
 
-private data class VyroPost(val author: String, val handle: String, val body: String, val tag: String, var likes: Int, var liked: Boolean = false, val comments: MutableList<String> = mutableListOf())
+private data class VyroPost(val author: String, val handle: String, val body: String, val tag: String, var likes: Int, var liked: Boolean = false, val comments: MutableList<String> = mutableListOf(), val remoteId: String = "")
 private enum class Tab(val ar: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     HOME("الرئيسية", Icons.Default.Home), SHORTS("شورتز", Icons.Default.PlayCircle), ROOMS("رومات", Icons.Default.Groups), MESSAGES("الرسائل", Icons.Default.ChatBubble), PROFILE("حسابي", Icons.Default.Person)
 }
@@ -49,13 +49,13 @@ class MainActivity : ComponentActivity() {
 private fun VyroApp(prefs: android.content.SharedPreferences) {
     var session by remember { mutableStateOf(prefs.getString("access_token", null)) }
     var userName by remember { mutableStateOf(prefs.getString("name", "مستخدم VYRO") ?: "مستخدم VYRO") }
-    if (!session) {
+    if (session.isNullOrBlank()) {
         AuthScreen(onAuthenticated = { name, remote ->
             userName = name.ifBlank { "مستخدم VYRO" }; session = remote.accessToken
             prefs.edit().putString("access_token", remote.accessToken).putString("user_id", remote.userId).putString("name", userName).apply()
         })
     } else {
-        MainShell(userName = userName, onLogout = { prefs.edit().clear().apply(); session = null })
+        MainShell(userName = userName, prefs = prefs, onLogout = { prefs.edit().clear().apply(); session = null })
     }
 }
 
